@@ -1,0 +1,22 @@
+rule match_genotype_sample:
+    input:
+        bam = "{dataset}/aligned/{sample}.sorted.bam",
+        vcf = "{dataset}/genotypes/Kumasaka_8_samples.merged.vcf.gz"
+    output:
+        bamstat = "{dataset}/bamstat/{sample}.bamstat.txt"
+    threads: 1
+    resources:
+        mem = 3000
+    shell:
+        "/gpfs/hpchome/a72094/software/bin/QTLtools mbv --bam {input.bam} --vcf {input.vcf} --out {output.bamstat}"
+
+rule make_all:
+    input:
+        expand("{dataset}/bamstat/{sample}.bamstat.txt", sample=config["samples_phase1"], dataset=config["path"])
+    output:
+        "out.txt"
+    threads: 1
+    resources:
+        mem = 1000
+    shell:
+        "echo 'Done! > {output}'"

@@ -1,0 +1,110 @@
+#Tabix index enriched peak file
+rule index_enriched:
+	input:
+		"{dataset}/tabix/cqn_permutations_{sub}_enriched.sorted.txt"
+	output:
+		"{dataset}/tabix/cqn_permutations_{sub}_enriched.sorted.txt.gz"
+	resources:
+		mem = 2000
+	threads: 1
+	shell:
+		"""
+		module load samtools-1.6
+		bgzip {input}
+		tabix -s9 -b10 -e11 -f {output}
+		"""
+		
+#unzip
+rule unzip:
+	input:
+		#"{dataset}/CTCF/ENCFF960ZGP.bed.gz",
+	output:
+		#"{dataset}/CTCF/ENCFF960ZGP.bed",
+	resources:
+		mem = 12000
+	threads: 1
+	shell:
+		"""
+		module load samtools-1.6
+		bgzip -d {input}
+		"""
+		
+#unzip
+rule gunzip:
+	input:
+		"{dataset}/annotations/wgEncodeBroadHmmGm12878HMM.bed.gz"
+	output:
+		"{dataset}/annotations/wgEncodeBroadHmmGm12878HMM.bed"
+	resources:
+		mem = 12000
+	threads: 1
+	shell:
+		"""
+		gunzip {input}
+		"""
+		
+#Edit unzipped file to remove "chr" and X chromosome
+rule edit:
+	input:
+		"{dataset}/annotations/wgEncodeBroadHmmGm12878HMM.bed"
+	output:
+		"{dataset}/annotations/wgEncodeBroadHmmGm12878HMM.edited.bed"
+	resources:
+		mem = 1000
+	threads: 1
+	shell:
+		"""
+		grep -v "chrX" {input} > {dataset}/temp.bed
+		cat {dataset}/temp.bed | awk '{print substr($0,4)}' > {output}
+		rm {dataset}/temp.bed
+		"""
+	
+#Sort ctcf peaks file by SNP position
+rule sort_ctcf:
+	input:
+		#"{dataset}/CTCF/ENCFF960ZGP.edited.bed",
+		"{dataset}/annotations/wgEncodeBroadHmmGm12878HMM.edited.bed"
+	output:
+		#protected("{dataset}/CTCF/ENCFF960ZGP.sorted.bed.gz"),
+		protected("{dataset}/annotations/wgEncodeBroadHmmGm12878HMM.sorted.bed.gz")
+	resources:
+		mem = 12000
+	threads: 20
+	shell:
+		"""
+		module load samtools-1.6
+		LANG=C sort --parallel=20 -k1,1n -k2,2n -k3,3n {input} | bgzip > {output}
+		rm {input}
+		"""
+
+# 1, 2, 3 <- peak chr, start, end		
+		
+#Tabix-index ctcf peak file
+rule index_qtltools_output:
+	input:
+		#"{dataset}/CTCF/ENCFF960ZGP.sorted.bed.gz",
+		"{dataset}/annotations/wgEncodeBroadHmmGm12878HMM.sorted.bed.gz"
+	output:
+		#"{dataset}/CTCF/ENCFF960ZGP.sorted.bed.gz.tbi",
+		"{dataset}/annotations/wgEncodeBroadHmmGm12878HMM.sorted.bed.gz.tbi"
+	resources:
+		mem = 4000
+	threads: 1
+	shell:
+		"""
+		module load samtools-1.6
+		tabix -s1 -b2 -e3 -f {input}
+		"""
+		
+rule make_all:
+	input:
+		expand("{dataset}/tabix/cqn_permutations_{sub}_enriched.sorted.txt.gz", dataset=config["path"], sub=config["sub"]),
+		#expand("{dataset}/CTCF/ENCFF960ZGP.sorted.bed.gz.tbi", dataset=config["path"]),
+		#expand("{dataset}/annotations/wgEncodeBroadHmmGm12878HMM.sorted.bed.gz.tbi", dataset=config["path"])
+	output:
+		"out.txt"
+	resources:
+		mem = 100
+	threads: 1
+	shell:
+		"echo 'Done' > {output}"

@@ -1,0 +1,101 @@
+rule separate_grouped_permutation:
+	input:
+		"/gpfs/hpchome/a72094/rocket/projects/GEUVADIS/RNAseq_pipeline/processed/GEUVADIS/qtltools/output/txrevise/naive.permuted.txt.gz"
+	output:
+		upstream = "{dataset}/GEUVADIS/txrevise/naive.permuted.upstream.txt",
+		contained = "{dataset}/GEUVADIS/txrevise/naive.permuted.contained.txt",
+		downstream = "{dataset}/GEUVADIS/txrevise/naive.permuted.downstream.txt"
+	resources:
+		mem = 1000
+	threads: 1
+	shell:
+		"""
+		zgrep "upstream" {input} > {output.upstream}
+		zgrep "contained" {input} > {output.contained}
+		zgrep "downstream" {input} > {output.downstream}
+		"""
+
+#Make tab separated file from QTLtools output
+rule tab_separate:
+	input:
+		#"{dataset}/GEUVADIS/txrevise/naive.permuted.{type}.significant.txt",
+		"{dataset}/CTCF/CTCF.permuted.significant.txt.gz"
+	output:
+		#"{dataset}/tabix/txrevise.significant.{type}.tab.txt.gz",
+		"{dataset}/CTCF/CTCF.permuted.significant.tab.txt.gz"
+	resources:
+		mem = 2000
+	threads: 1
+	shell:
+		"""
+		module load samtools-1.6
+		cat {input} | awk -v OFS='\t' '{{$1=$1; print $0}}' | bgzip > {output}
+		"""
+		
+#unzip
+rule unzip:
+	input:
+		#"{dataset}/tabix/txrevise.significant.{type}.tab.txt.gz",
+		"{dataset}/CTCF/CTCF.permuted.significant.tab.txt.gz"
+	output:
+		#"{dataset}/tabix/txrevise.significant.{type}.tab.txt",
+		"{dataset}/CTCF/CTCF.permuted.significant.tab.txt"
+	resources:
+		mem = 12000
+	threads: 1
+	shell:
+		"""
+		module load samtools-1.6
+		bgzip -d {input}
+		"""
+	
+#Sort QTLtools output file by SNP position(QTLtools output from zenodo)
+rule sort_qtltools_output:
+	input:
+		#"{dataset}/tabix/txrevise.significant.{type}.tab.txt",
+		"{dataset}/CTCF/CTCF.permuted.significant.tab.txt"
+	output:
+		#protected("{dataset}/tabix/txrevise.significant.{type}.sorted.txt.gz"),
+		protected("{dataset}/CTCF/CTCF.permuted.significant.sorted.txt.gz")
+	resources:
+		mem = 12000
+	threads: 20
+	shell:
+		"""
+		module load samtools-1.6
+		LANG=C sort --parallel=20 -k9,9n -k10,10n -k11,11n {input} | bgzip > {output}
+		rm {input}
+		"""
+
+#vanilla QTLtools output 9, 10, 11 <- variant chr, start, end		
+#featureCounts/txrevise 11, 12, 13 <- variant chr, start, end 
+		
+#Tabix-index QTLtools output files
+rule index_qtltools_output:
+	input:
+		#"{dataset}/tabix/txrevise.significant.{type}.sorted.txt.gz",
+		"{dataset}/CTCF/CTCF.permuted.significant.sorted.txt.gz"
+	output:
+		#"{dataset}/tabix/txrevise.significant.{type}.sorted.txt.gz.tbi",
+		"{dataset}/CTCF/CTCF.permuted.significant.sorted.txt.gz.tbi"
+	resources:
+		mem = 4000
+	threads: 1
+	shell:
+		"""
+		module load samtools-1.6
+		tabix -s9 -b10 -e11 -f {input}
+		"""
+		
+rule make_all:
+	input:
+		#expand("{dataset}/tabix/txrevise.significant.{type}.sorted.txt.gz.tbi", dataset=config["path"], type=config["type"]),
+		#expand("{dataset}/GEUVADIS/txrevise/naive.permuted.{type}.txt", dataset=config["path"], type=config["type"]),
+		expand("{dataset}/CTCF/CTCF.permuted.significant.sorted.txt.gz.tbi", dataset=config["path"])
+	output:
+		"out.txt"
+	resources:
+		mem = 100
+	threads: 1
+	shell:
+		"echo 'Done' > {output}"
