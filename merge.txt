@@ -1,0 +1,6 @@
+cat /gpfs/rocket/home/a72094/projects/chromatin_to_splicing/QTL/cqn_nominal_*_100.txt | gzip -c > /gpfs/rocket/home/a72094/projects/chromatin_to_splicing/QTL/cqn_nominal_full.txt.gz
+cat /gpfs/rocket/home/a72094/projects/chromatin_to_splicing/QTL/fpkm_nominal_*_100.txt | gzip -c > /gpfs/rocket/home/a72094/projects/chromatin_to_splicing/QTL/fpkm_nominal_full.txt.gz
+cat /gpfs/rocket/home/a72094/projects/chromatin_to_splicing/QTL/cqn_permutations_*_100_10000.txt | gzip -c > /gpfs/rocket/home/a72094/projects/chromatin_to_splicing/QTL/cqn_permutations_10000_full.txt.gz
+cat /gpfs/rocket/home/a72094/projects/chromatin_to_splicing/QTL/cqn_permutations_*_100_100000.txt | gzip -c > /gpfs/rocket/home/a72094/projects/chromatin_to_splicing/QTL/cqn_permutations_100000_full.txt.gz
+cat /gpfs/rocket/home/a72094/projects/chromatin_to_splicing/QTL/fpkm_permutations_*_100_10000.txt | gzip -c > /gpfs/rocket/home/a72094/projects/chromatin_to_splicing/QTL/fpkm_permutations_10000_full.txt.gz
+cat /gpfs/rocket/home/a72094/projects/chromatin_to_splicing/QTL/fpkm_permutations_*_100_100000.txt | gzip -c > /gpfs/rocket/home/a72094/projects/chromatin_to_splicing/QTL/fpkm_permutations_100000_full.txt.gz

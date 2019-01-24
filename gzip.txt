@@ -1,0 +1,2 @@
+bgzip /gpfs/rocket/home/a72094/projects/chromatin_to_splicing/normalized/counts_matrix_cqn.bed && tabix -p bed /gpfs/rocket/home/a72094/projects/chromatin_to_splicing/normalized/counts_matrix_cqn.bed.gz
+bgzip /gpfs/rocket/home/a72094/projects/chromatin_to_splicing/normalized/counts_matrix_fpkm.bed && tabix -p bed /gpfs/rocket/home/a72094/projects/chromatin_to_splicing/normalized/counts_matrix_fpkm.bed.gz
