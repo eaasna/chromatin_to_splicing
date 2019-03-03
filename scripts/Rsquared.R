@@ -1,27 +1,8 @@
 library(readr)
 library(Rsamtools)
 library(dplyr)
+library(devtools)
 load_all("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/seqUtils/")
-
-add_to_df_with_info <- function(rida) {
-  e_id = e_names[rida['expression']]  #snp_id from genotypes file
-  ca_id = ca_names[rida['chromatin_accessibility']] 
-  gene_line = eQTL[[1]][which(eQTL[[1]]$genotype_snp_id == e_id),c(1, 2, 3, 4, 6, 8, 10, 16, 19)]
-  peak_line = caQTL[[1]][which(caQTL[[1]]$genotype_snp_id == ca_id),c(1, 2, 3, 4, 6, 8, 10, 12, 13)]
-  colnames(gene_line) <- c("gene_id", "gene_chr", "gene_start", "gene_end", "gene_n_snps", "gene_snp_id", "gene_snp_location", "gene_p_nominal", "gene_beta")
-  colnames(peak_line) <- c("peak_id", "peak_chr", "peak_start", "peak_end", "peak_n_snps", "peak_snp_id", "peak_snp_location", "peak_p_nominal", "peak_beta")
-  
-  rsq = rsq_matrix[rida['chromatin_accessibility'], rida['expression']]
-  gene_line = dplyr::mutate(gene_line, rsquared = rsq)
-  
-  if (nrow(peak_line)==nrow(gene_line)){        #!! peab tegelema mitmerealistega
-    pair = dplyr::bind_cols(peak_line, gene_line)
-  } else {
-    pair = dplyr::bind_cols(peak_line[1,], gene_line[1,])
-  }
-  
-  write.table(pair, file = outfile, col.names = F, quote = F, row.names = F, append = T)
-}
 
 add_to_df_coverage <- function(rida) {
   e_id = e_names[rida['expression']]  #snp_id from genotypes file
@@ -49,23 +30,27 @@ add_to_df <- function(rida) {
   }
 }
 
-#sub = "upstream"
+sub = "upstream"
 #sub = "contained"
 #sub = "downstream"
-sub = "featureCounts"
+#sub = featureCounts
+
 
 # overap between ATAC peaks and RNA QTLs that is covered peaks
-#outfile = paste("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/results/rsquared/cqn_txrevise_", sub, "_coverage.txt", sep ="")
+#outfile = paste("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/results/rsquared08/cqn_txrevise_", sub, "_rsq.txt", sep ="")
 #eqtl_file = paste("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/tabix/txrevise.significant.", sub, ".sorted.txt.gz", sep="")
+
+#outfile = "/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/results/rsquared09/cqn_featureCounts_rsq.txt"
+#eqtl_file = "/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/tabix/featureCounts.significant.sorted.txt.gz"
 
 
 # overlap between covered ATAC peaks and CTCF QTLs 
-#outfile = paste("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/results/ctcf/cqn_", sub, "_rsq.txt", sep="")
-#eqtl_file = "/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/CTCF/CTCF.permuted.significant.sorted.txt.gz"
+eqtl_file = "/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/CTCF/CTCF.permuted.significant.sorted.txt.gz"
+outfile = paste("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/results/ctcf/cqn_", sub, "_rsq09.txt", sep="")
+
 
 # overlap between all ATAC peaks and CTCF QTLs 
-outfile = "/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/results/ctcf/cqn_rsq.txt"
-eqtl_file = "/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/CTCF/CTCF.permuted.significant.sorted.txt.gz"
+#outfile = "/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/results/ctcf/cqn_rsq09.txt"
 
 
 #-----------
@@ -94,10 +79,10 @@ for (chr in chrs){
     eQTL = scanTabixDataFrame(eqtl_file, gr, col_names = FALSE)
 
     # finding covered peaks
-    caQTL = scanTabixDataFrame("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/tabix/cqn_permutations_100000_significant.sorted.txt.gz", gr, col_names = FALSE)
+    #caQTL = scanTabixDataFrame("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/tabix/cqn_permutations_100000_significant.sorted.txt.gz", gr, col_names = FALSE)
     
     # finding covered peaks that are enriched with CTCF
-    #caQTL = scanTabixDataFrame(paste("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/tabix/cqn_permutations_", sub, "_enriched.sorted.txt.gz", sep=""), gr, col_names = FALSE)
+    caQTL = scanTabixDataFrame(paste("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/results/rsquared09/cqn_", sub, "_enriched.sorted.txt.gz", sep=""), gr, col_names = FALSE)
     
     if (lengths(eQTL[])[1]!=0 & lengths(eQTL[])[1]!=1 & lengths(caQTL[])[1]!=0 & lengths(caQTL[])[1]!=1){
       
@@ -161,7 +146,7 @@ for (chr in chrs){
             colnames(rsq_matrix) <- row.names(e_genotypes) #!!! viga
         }
         #kuidas leida indeks, kus suurem kui 0.8
-        significant = as.matrix(which(rsq_matrix > 0.8, arr.ind = T))
+        significant = as.matrix(which(rsq_matrix > 0.9, arr.ind = T))
         
         #kas leidub mõni paar, mille rsquared>0.8
         if (dim(significant)[1]!=0){
@@ -171,8 +156,9 @@ for (chr in chrs){
           ca_names = rownames(rsq_matrix)
           e_names = colnames(rsq_matrix)
           
-          apply(significant, 1, add_to_df_coverage)
+          apply(significant, 1, add_to_df)
         }
+        
       }
       
     } #// if 

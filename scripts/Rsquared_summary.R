@@ -23,11 +23,12 @@ length(unique(qtl$V1))
 
 
 total = c(5957, 1200, 2716, 2065)
-with_peak = c(1164, 198, 344, 269)
-df = data.frame(total, with_peak)
+with_peak08 = c(1164, 198, 344, 269)
+with_peak09 = c(914, 136, 245, 178)
+df = data.frame(total, with_peak08, with_peak09)
+row.names(df) = c("featureCounts", "upstream", "contained", "downstream")
 
 
-#sum = read.table("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/results/rsquared/Rsquared_summary.txt", sep = ',', header = T)
 
 df = dplyr::mutate(df, without_peak = df$total - df$with_peak)
 row.names(df) = c('featureCounts', 'upstream', 'contained', 'downstream')
@@ -35,30 +36,20 @@ row.names(df) = c('featureCounts', 'upstream', 'contained', 'downstream')
 write.table(df, "/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/results/rsquared/Rsquared_summary.txt")
 
 
+
+
+threshold = "with_peak09"
 # H0: igat tüüpi eQTL'del on võrdselt ülekatet(coverage)
-# H1: promootoril(upstream) on rohkem ülekatet kui 3' otsal
-fisher.test(rbind(c(269,198),c(1796,1002)), alternative="less")$p.value
+ttest = function(threshold, less, more) {
+  print(paste("H1:", more, " rohkem ülekatet kui ", less))
+  fisher.test(rbind(c(df[less, threshold], df[more, threshold]),c(df[less, "total"]-df[less, threshold],df[more, "total"]-df[more, threshold])), alternative="less")$p.value
+}
 
-# H1: promootoril on rohkem ülekatet kui keskmisel eksonil
-fisher.test(rbind(c(344,198),c(2372,1002)), alternative="less")$p.value
-
-# H1: promootoril on rohkem ülekatet kui featureCounts
-fisher.test(rbind(c(1164,198),c(4793,1002)), alternative="less")$p.value
-
-# H1: featureCounts on rohkem ülekatet kui promootoril
-fisher.test(rbind(c(198,1164),c(1002,4793)), alternative="less")$p.value
-
-# H1: featureCounts on rohkem ülekatet kui 3' otsal
-fisher.test(rbind(c(269,1164),c(1796,4793)), alternative="less")$p.value
-
-# H1: featureCounts on rohkem ülekatet kui keskmisel eksonil
-fisher.test(rbind(c(344,1164),c(2372,4793)), alternative="less")$p.value
-
-# H1: keskmisel eksonil on rohkem ülekatet kui 3' otsal
-fisher.test(rbind(c(269,344),c(1796,2372)), alternative="less")$p.value
-
-
-txrevise = read.table("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/GEUVADIS/txrevise/naive.permuted.upstream.significant.txt")
-snap = unique(txrevise$V10)
-write.table(snap, "/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/GEUVADIS/txrevise/upstream.significant.snps.txt", col.names = F, quote = F, row.names = F, append = F)
+ttest(threshold, "downstream", "upstream")
+ttest(threshold, "contained", "upstream")
+ttest(threshold, "featureCounts", "upstream")
+ttest(threshold, "upstream", "featureCounts")
+ttest(threshold, "contained", "featureCounts")
+ttest(threshold, "downstream", "featureCounts")
+ttest(threshold, "contained", "downstream")
 

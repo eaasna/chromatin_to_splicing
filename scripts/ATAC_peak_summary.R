@@ -20,15 +20,17 @@ regulatory_df = data.frame(row.names = unique(annotations$V4), "peaks" = vector(
 #ctcf = read.table("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/CTCF/ENCFF960ZGP.sorted.bed.gz")
 #gr_bindingsites <- GRanges(seqnames = ctcf$V1, strand = c("*"), ranges = IRanges(start = ctcf$V2, end = ctcf$V3))
 #QTLtools 
-ctcf = read.table("/gpfs/hpchome/a72094/rocket/projects/chromatin_to_splicing/CTCF/CTCF.permuted.significant.txt.gz")
+ctcf = read.table("/gpfs/hpchome/a72094/rocket/projects/chromatin-QTLs/Blood_ATAC/processed/CTCF/qtltools/output/cqn/CTCF.permuted.txt.gz")
 gr_bindingsites <- GRanges(seqnames = ctcf$V2, strand = c("*"), ranges = IRanges(start = ctcf$V3, end = ctcf$V4, names = ctcf$V1))
-
 
 
 
 # CTCF binding sites overlaping peaks
 binding_sites_within_peaks = subsetByOverlaps(gr_bindingsites, gr_peaks)
 
+peaks_within_binding_sites = subsetByOverlaps(gr_peaks, gr_bindingsites)
+#kui suur osa kühmudest sisaldab ctcf seondumiskohta
+length(gr_peaks)/length(unique(names(peaks_within_binding_sites)))
 
 #huvipakkuvate kühmude arv
 print(length(peaks$V1))
