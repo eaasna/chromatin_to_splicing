@@ -1,0 +1,196 @@
+---
+title: "ENCODE HP1 seondumissaidid"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+library(readr)
+library(Rsamtools)
+```
+
+
+```{r include = FALSE}
+# Avatud kromatiin
+caQTL = read.table("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/tabix/cqn_permutations_100000_significant.sorted.txt.gz")
+```
+
+
+```{r include = FALSE}
+# ENCODE CTCF seondumissaidid
+#tf_file = "/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/CTCF/ENCFF960ZGP.sorted.bed.gz"
+#tf = read.table(tf_file)
+#bindingsites <- GRanges(seqnames = tf$V1, strand = c("*"), ranges = IRanges(start = tf$V2, end = tf$V3))
+```
+
+
+```{r include = FALSE}
+#HP1 seondumissaidid
+tf_file = "/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/HP1/ENCFF417SVR.sorted.bed.gz" 
+tf = read.table(tf_file)
+bindingsites <- GRanges(seqnames = tf$V1, strand = c("*"), ranges = IRanges(start = tf$V2, end = tf$V3))
+```
+
+
+```{r include = FALSE}
+#CTCF QTLtools seondumissaidid
+#tf_file = "/gpfs/hpchome/a72094/rocket/projects/chromatin-QTLs/Blood_ATAC/processed/CTCF/qtltools/output/cqn/CTCF.permuted.txt.gz" # kõik seondumiskohad
+#tf = read.table(tf_file)
+#bindingsites <- GRanges(seqnames = tf$V2, strand = c("*"), ranges = IRanges(start = tf$V3, end = tf$V4, names = tf$V1))
+```
+
+
+
+```{r include=FALSE}
+# Ühe RNA taseme tunnusega seotud kromatiini avatuse kühmud ja ülekate transkriptsioonifaktorite seondumissaitidega
+RNA_tunnuse_rida = function(enriched, unenriched){
+  unenriched_peaks = GRanges(seqnames = unenriched$V2, strand = c("*"), ranges = IRanges(start = unenriched$V3, end = unenriched$V4, names = unenriched$V1))
+  unenriched_peaks_with_binding_site = subsetByOverlaps(unenriched_peaks, bindingsites)
+  
+  enriched_peaks = GRanges(seqnames = enriched$V2, strand = c("*"), ranges = IRanges(start = enriched$V3, end = enriched$V4, names = enriched$V1))
+  enriched_peaks_with_binding_site = subsetByOverlaps(enriched_peaks, bindingsites)
+  
+  RNA_TF = length(enriched_peaks_with_binding_site)
+  RNA_no_TF = length(enriched_peaks) - length(enriched_peaks_with_binding_site)
+  no_RNA_TF = length(unenriched_peaks_with_binding_site)
+  no_RNA_no_TF = length(unenriched_peaks) - length(unenriched_peaks_with_binding_site)
+  
+  
+  return(c(RNA_TF, round(RNA_TF/(RNA_TF+no_RNA_TF)*100, 2), RNA_no_TF, round(RNA_no_TF/(RNA_no_TF+no_RNA_no_TF)*100, 2), no_RNA_TF, no_RNA_no_TF))
+}
+```
+
+
+```{r include=FALSE}
+# RNA tunnused
+leia_EB = function(r){
+  tabel <- data.frame(matrix(ncol = 6, nrow = 5))
+  colnames(tabel) <- c("RNA_TF","RNA_TF%", "RNA_no_TF","RNA_no_TF%", "no_RNA_TF", "no_RNA_no_TF")
+  row.names(tabel) <- c("featureCounts", "upstream", "contained", "downstream", "kokku")
+  
+  featureCounts = read.table(paste("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/results/rsquared", r, "/cqn_featureCounts_enriched.txt", sep=""))
+  upstream = read.table(paste("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/results/rsquared", r, "/cqn_upstream_enriched.txt", sep=""))
+  contained = read.table(paste("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/results/rsquared", r,"/cqn_contained_enriched.txt", sep=""))
+  downstream = read.table(paste("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/results/rsquared", r, "/cqn_downstream_enriched.txt", sep=""))
+
+  tabel["featureCounts", ] = RNA_tunnuse_rida(featureCounts, caQTL[which(!(caQTL$V1 %in% featureCounts$V1)),])
+  tabel["upstream", ] = RNA_tunnuse_rida(upstream, caQTL[which(!(caQTL$V1 %in% upstream$V1)),])
+  tabel["contained", ] = RNA_tunnuse_rida(contained, caQTL[which(!(caQTL$V1 %in% contained$V1)),])
+  tabel["downstream", ] = RNA_tunnuse_rida(downstream, caQTL[which(!(caQTL$V1 %in% downstream$V1)),])
+
+  kokku_unenriched = caQTL[which(!(caQTL$V1 %in% featureCounts$V1 | caQTL$V1 %in% upstream$V1 | caQTL$V1 %in% contained$V1 | caQTL$V1 %in% downstream$V1)),]
+  kokku_enriched = caQTL[which(caQTL$V1 %in% featureCounts$V1 | caQTL$V1 %in% upstream$V1 | caQTL$V1 %in% contained$V1 | caQTL$V1 %in% downstream$V1),]
+
+  tabel["kokku", ] = RNA_tunnuse_rida(kokku_enriched, kokku_unenriched)
+  
+  return(tabel)
+}
+```
+
+
+```{r}
+tabel08 = leia_EB("08")
+tabel08
+```
+
+```{r}
+tabel09 = leia_EB("09")
+tabel09
+```
+
+Kontroll, kas igas reas on 25872 kühmu?
+```{r}
+as.symbol(rowSums(within(tabel08, rm("RNA_TF%", "RNA_no_TF%"))) == 25872 & rowSums(within(tabel09, rm("RNA_TF%", "RNA_no_TF%"))) == 25872)
+```
+
+Kontroll, kas madalama r2 taseme juures olen leidnud rohkem seotud RNA tunnuseid
+```{r}
+as.symbol(tabel08[,"RNA_TF"]>tabel09[,"RNA_TF"] & tabel08[,"RNA_no_TF"]>tabel09[,"RNA_no_TF"])
+```
+
+
+```{r include=FALSE}
+# kas seos RNA tunnusega mõjutab TF seondumiskohtade osakaalu?
+test_rida = function(tabel, type){
+  return(fisher.test(rbind(c(tabel[type, "no_RNA_TF"], tabel[type, "RNA_TF"]),c(tabel[type, "no_RNA_no_TF"],tabel[type, "RNA_no_TF"])), alternative="less")$p.value)
+}
+```
+
+#### Kas teatud RNA taseme tunnusega seotud kühmude hulgas on TF seondumiskohad üleesindatud? Kas TF seondumiskohtade hulgas on seos RNA taseme tunnusega üleesindatud?
+H0: TF seondumine ei ole põhiline transkriptsiooni kontrollimehhanism. TF seondumiskoha esinemine ei väljendu fenotüübis  
+
+H1: RNA tunnusega seotud kühmude hulgas on TF seondumiskohad üleesindatud
+```{r include=FALSE}
+p_tabel = data.frame(matrix(ncol = 2, nrow = 5))
+colnames(p_tabel) <- c("0.8", "0.9")
+row.names(p_tabel) <- c("featureCounts", "upstream", "contained", "downstream", "kokku")
+
+p_tabel["featureCounts", "0.8"] = test_rida(tabel08, "featureCounts")
+p_tabel["upstream", "0.8"] = test_rida(tabel08, "upstream")
+p_tabel["contained", "0.8"] = test_rida(tabel08, "contained")
+p_tabel["downstream", "0.8"] = test_rida(tabel08, "downstream")
+p_tabel["kokku", "0.8"] = test_rida(tabel08, "kokku")
+
+
+p_tabel["featureCounts", "0.9"] = test_rida(tabel09, "featureCounts")
+p_tabel["upstream", "0.9"] = test_rida(tabel09, "upstream")
+p_tabel["contained", "0.9"] = test_rida(tabel09, "contained")
+p_tabel["downstream", "0.9"] = test_rida(tabel09, "downstream")
+p_tabel["kokku", "0.9"] = test_rida(tabel09, "kokku")
+```
+
+```{r}
+p_tabel
+```
+
+
+```{r include=FALSE}
+test_RNAtunnused = function(higher, lower, tabel){
+  return(fisher.test(rbind(c(tabel[higher, "RNA_TF"], tabel[lower, "RNA_TF"]),c(tabel[higher, "RNA_no_TF"], tabel[lower, "RNA_no_TF"])), alternative="less")$p.value)
+}
+```
+
+
+```{r include=FALSE}
+test_tabel = function(tabel){
+  
+  p_tabel <- data.frame(matrix(ncol = 4, nrow = 4))
+  colnames(p_tabel) <- c("featureCounts", "upstream", "contained", "downstream")
+  row.names(p_tabel) <- c("featureCounts", "upstream", "contained", "downstream")
+  
+  p_tabel["featureCounts", "upstream"] = test_RNAtunnused("featureCounts", "upstream", tabel)
+  p_tabel["featureCounts", "contained"] = test_RNAtunnused("featureCounts", "contained", tabel)
+  p_tabel["featureCounts", "downstream"] = test_RNAtunnused("featureCounts", "downstream", tabel)
+  
+  p_tabel["upstream", "featureCounts"] = test_RNAtunnused("upstream", "featureCounts", tabel)
+  p_tabel["upstream", "contained"] = test_RNAtunnused("upstream", "contained", tabel)
+  p_tabel["upstream", "downstream"] = test_RNAtunnused("upstream", "downstream", tabel)
+  
+  p_tabel["contained", "featureCounts"] = test_RNAtunnused("contained", "featureCounts", tabel)
+  p_tabel["contained", "upstream"] = test_RNAtunnused("contained", "upstream", tabel)
+  p_tabel["contained", "downstream"] = test_RNAtunnused("contained", "downstream", tabel)
+  
+  p_tabel["downstream", "upstream"] = test_RNAtunnused("downstream", "upstream", tabel)
+  p_tabel["downstream", "contained"] = test_RNAtunnused("downstream", "contained", tabel)
+  p_tabel["downstream", "featureCounts"] = test_RNAtunnused("downstream", "featureCounts", tabel)
+  
+  print(p_tabel)
+}
+```
+
+#### Kas TFga ülekattes olev caQTL mõjutab suurema tõenäosusega näiteks splaissimist kui geeniekspressiooni? 
+H0: mõlemat tüüpi RNA taseme tunnusega seotud kühmude hulgas leidub võrdne osakaal TF seondumissaite  
+
+H1: Veerus oleva RNA tunnuse puhul on TF seondumiskohtadega kattumine suurem 
+```{r}
+test_tabel(tabel08)
+```
+```{r}
+test_tabel(tabel09)
+```
+

@@ -3,9 +3,9 @@ library(Rsamtools)
 
 
 # ENCODE
-ctcf_file = "/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/CTCF/ENCFF960ZGP.sorted.bed.gz"
-ctcf = read.table(ctcf_file)
-bindingsites <- GRanges(seqnames = ctcf$V1, strand = c("*"), ranges = IRanges(start = ctcf$V2, end = ctcf$V3))
+#ctcf_file = "/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/CTCF/ENCFF960ZGP.sorted.bed.gz"
+#ctcf = read.table(ctcf_file)
+#bindingsites <- GRanges(seqnames = ctcf$V1, strand = c("*"), ranges = IRanges(start = ctcf$V2, end = ctcf$V3))
 
 # QTLtools
 #ctcf_file = "/gpfs/hpchome/a72094/rocket/projects/chromatin_to_splicing/CTCF/CTCF.permuted.significant.txt.gz" # seondumiskohad, millel leidub statistiliselt oluline QTL
@@ -14,7 +14,10 @@ ctcf = read.table(ctcf_file)
 bindingsites <- GRanges(seqnames = ctcf$V2, strand = c("*"), ranges = IRanges(start = ctcf$V3, end = ctcf$V4, names = ctcf$V1))
 
 
-sub = "featureCounts"
+#sub = "featureCounts"
+#sub = "upstream"
+#sub = "contained"
+sub = "downstream"
 r = "08"
 # kühmud, mis on seotud teatud tüüpi RNA tunnusega
 peak_file = paste("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/results/rsquared", r, "/cqn_", sub ,"_enriched.txt", sep="")
@@ -48,7 +51,6 @@ eb = length(unenriched_peaks) - length(unenriched_peaks_with_binding_site)
 
 # H0: enriched ja unenriched kühmude hulgas on võrdselt CTCF seondumiskohti
 # H1: unenriched kühmude hulgas on rohkem CTCF seondumissaite
-
 # unenriched on rohkem CTCF seondumiskohti?
 fisher.test(rbind(c(EB, eB),c(Eb, eb)), alternative="less")$p.value
 
@@ -63,7 +65,6 @@ print(EB)
 print(Eb)
 print(eB)
 print(eb)
-
 
 # Enne võrdlesin ühte tüüpi RNA QTL'de puhul kas, leian CTCF mõju
 # Nüüd võrdlen omavahel erinevat tüüpi RNA QTL'e
@@ -129,5 +130,9 @@ print(eb)
 
 # kas CTCF seondumiskoha leidumine tähendab seda, et kühm on suurema tõenäosusega seotud mõne RNA taseme tunnusega
 fisher.test(rbind(c(Eb, EB),c(eb, eB)), alternative="less")$p.value
+
+
+# H1: unenriched kühmude hulgas on rohkem CTCF seondumissaite
+fisher.test(rbind(c(EB, eB),c(Eb, eb)), alternative="less")$p.value
 
 

@@ -1,0 +1,228 @@
+---
+title: "CTCF QTLd"
+author: "Evelin Aasna"
+date: "3/5/2019"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+library(readr)
+library(Rsamtools)
+library(dplyr)
+```
+
+
+Kõik kromatiini avatuse kühmud
+```{r}
+caQTL = read.table("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/tabix/cqn_permutations_100000_significant.sorted.txt.gz")
+```
+
+
+```{r}
+path = "/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/results"
+```
+
+Leian üle kõigi RNA tunnuste kühmude arvu, millel
+
+1.  leidub seos RNA tunnusega ja CTCFga <- RNA_CTCF
+2.  leidub seos RNA tunnusega aga mitte CTCFga <- RNA_no_CTCF
+3.  ei leidu seos RNA tunnusega aga leidub CTCFga <- no_RNA_CTCF
+4.  ei leidu seos RNA tunnusega ega CTCFga <- no_RNA_no_CTCF
+
+lisaks: seotud RNA tunnusega(vb CTCF) <- RNA
+
+```{r include=FALSE}
+tabeli_rida = function(sub, r){
+  #1. seotud RNA tunnusega ja CTCF QTLga 
+  RNA_CTCF = read.table(paste(path,"/ctcf/cqn_", sub,"_enriched", r, ".txt", sep=""))
+  RNA = read.table(paste(path,"/rsquared", r,"/cqn_", sub,"_enriched.txt", sep=""))
+  #2. leidub seos RNA tunnusega aga mitte CTCFga
+  RNA_no_CTCF = RNA[which(!(RNA$V1 %in% RNA_CTCF$V1)),]
+  #3. ei leidu seos RNA tunnusega aga leidub CTCFga
+  no_RNA_CTCF = caQTL[which(caQTL$V1 %in% ATAC_CTCF$V1 & !caQTL$V1 %in% RNA_CTCF$V1), ]
+  #4. ei leidu seos RNA tunnusega ega CTCFga
+  no_RNA_no_CTCF = caQTL[which(!(caQTL$V1 %in% ATAC_CTCF$V1 | caQTL$V1 %in% RNA$V1)), ]
+  
+  return(c(dim(RNA_CTCF)[1],round((dim(RNA_CTCF)[1]/(dim(RNA_CTCF)[1]+dim(no_RNA_CTCF)[1])*100),2), dim(RNA_no_CTCF)[1], round((dim(RNA_no_CTCF)[1]/(dim(RNA_no_CTCF)[1]+dim(no_RNA_no_CTCF)[1])*100),2), dim(no_RNA_CTCF)[1], dim(no_RNA_no_CTCF)[1]))
+}
+```
+
+
+Leian seose CTCF QTLdega üle kõigi RNA tunnuste kokku
+```{r include=FALSE}
+kokku_rida = function(r){
+  #Kromatiini avatuse kühmud, mis seotud RNA tunnusega ja CTCF QTLga
+  featureCounts_CTCF = read.table(paste(path,"/ctcf/cqn_featureCounts_enriched", r, ".txt", sep=""))
+  upstream_CTCF = read.table(paste(path,"/ctcf/cqn_upstream_enriched", r, ".txt", sep=""))
+  contained_CTCF = read.table(paste(path,"/ctcf/cqn_contained_enriched", r, ".txt", sep=""))
+  downstream_CTCF = read.table(paste(path,"/ctcf/cqn_downstream_enriched", r, ".txt", sep=""))
+  #Kromatiini avatuse kühmud, mis on seotud RNA tunnusega
+  featureCounts = read.table(paste(path,"/rsquared",r,"/cqn_featureCounts_enriched.txt", sep=""))
+  upstream = read.table(paste(path,"/rsquared",r,"/cqn_upstream_enriched.txt", sep=""))
+  contained = read.table(paste(path,"/rsquared",r,"/cqn_contained_enriched.txt", sep=""))
+  downstream = read.table(paste(path,"/rsquared",r,"/cqn_downstream_enriched.txt", sep=""))
+
+  #Kokkuvõtvalt üle kõigi RNA tunnuste
+  kokku_CTCF = caQTL[which(caQTL$V1 %in% featureCounts_CTCF$V1 | caQTL$V1 %in% upstream_CTCF$V1 | caQTL$V1 %in% contained_CTCF$V1 | caQTL$V1 %in% downstream_CTCF$V1),]
+  kokku = caQTL[which(caQTL$V1 %in% featureCounts$V1 | caQTL$V1 %in% upstream$V1 | caQTL$V1 %in% contained$V1 | caQTL$V1 %in% downstream$V1),]
+  kokku_no_CTCF = kokku[which(!(kokku$V1 %in% kokku_CTCF$V1)),]
+  no_kokku_CTCF = caQTL[which(caQTL$V1 %in% ATAC_CTCF$V1 & !caQTL$V1 %in% kokku_CTCF$V1), ]
+  no_kokku_no_CTCF = caQTL[which(!(caQTL$V1 %in% ATAC_CTCF$V1 | caQTL$V1 %in% kokku$V1)), ]
+  
+  return(c(dim(kokku_CTCF)[1], round((dim(kokku_CTCF)[1]/(dim(kokku_CTCF)[1]+dim(no_kokku_CTCF)[1])*100),2), dim(kokku_no_CTCF)[1],round((dim(kokku_no_CTCF)[1]/(dim(kokku_no_CTCF)[1]+dim(no_kokku_no_CTCF)[1])*100),2), dim(no_kokku_CTCF)[1], dim(no_kokku_no_CTCF)[1]))
+}
+
+```
+
+
+
+```{r include=FALSE}
+# dataframe kuhu kogun kühmude arvu 
+tabel08 = data.frame(matrix(ncol = 6, nrow = 5))
+colnames(tabel08) <- c("RNA_CTCF", "RNA_CTCF%", "RNA_no_CTCF","RNA_no_CTCF%", "no_RNA_CTCF", "no_RNA_no_CTCF")
+row.names(tabel08) <- c("featureCounts", "upstream", "contained", "downstream", "kokku")
+
+tabel09 = data.frame(matrix(ncol = 6, nrow = 5))
+colnames(tabel09) <- c("RNA_CTCF","RNA_CTCF%", "RNA_no_CTCF","RNA_no_CTCF%", "no_RNA_CTCF", "no_RNA_no_CTCF")
+row.names(tabel09) <- c("featureCounts", "upstream", "contained", "downstream", "kokku")
+```
+
+```{r}
+r = "08"
+```
+
+Kromatiini avatuse kühmud, mis on seotud CTCF QTLga
+```{r}
+ATAC_CTCF = read.table(paste("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/results/ctcf/cqn_enriched", r, ".txt", sep =""))
+```
+
+```{r}
+tabel08["featureCounts", ] = tabeli_rida("featureCounts", r)
+tabel08["upstream", ] = tabeli_rida("upstream", r)
+tabel08["contained", ] = tabeli_rida("contained", r)
+tabel08["downstream", ] = tabeli_rida("downstream", r)
+tabel08["kokku", ] = kokku_rida(r)
+tabel08
+```
+
+```{r}
+r = "09"
+```
+
+Kromatiini avatuse kühmud, mis on seotud CTCF QTLga
+```{r}
+ATAC_CTCF = read.table(paste("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/results/ctcf/cqn_enriched", r, ".txt", sep =""))
+```
+
+```{r}
+tabel09["featureCounts", ] = tabeli_rida("featureCounts", r)
+tabel09["upstream", ] = tabeli_rida("upstream", r)
+tabel09["contained", ] = tabeli_rida("contained", r)
+tabel09["downstream", ] = tabeli_rida("downstream", r)
+tabel09["kokku", ] = kokku_rida(r)
+tabel09
+```
+
+
+Kas kokku **25872** kromatiini kühmu? (Mittelõikuvad hulgad)
+```{r}
+as.symbol(rowSums(within(tabel08, rm("RNA_CTCF%", "RNA_no_CTCF%"))) == 25872 & rowSums(within(tabel09, rm("RNA_CTCF%", "RNA_no_CTCF%"))) == 25872)
+```
+
+**Kontroll**, kas madalama r2 taseme juures olen leidnud rohkem seotud RNA tunnuseid
+```{r}
+as.symbol(tabel08[,"RNA_CTCF"]>tabel09[,"RNA_CTCF"] & tabel08[,"RNA_no_CTCF"]>tabel09[,"RNA_no_CTCF"])
+```
+
+
+
+```{r include=FALSE}
+# kas seos RNA tunnusega mõjutab CTCF QTLdega seotud kühmude osakaalu?
+test_rida = function(tabel, type){
+  return(fisher.test(rbind(c(tabel[type, "no_RNA_CTCF"], tabel[type, "RNA_CTCF"]),c(tabel[type, "no_RNA_no_CTCF"],tabel[type, "RNA_no_CTCF"])), alternative="less")$p.value)
+}
+```
+
+#### Kas teatud RNA taseme tunnusega seotud kühmude hulgas on CTCF QTLd üleesindatud? 
+
+H0: CTCF seondumine ei ole põhiline transkriptsiooni kontrollimehhanism. CTCF QTLga seostumine ei väljendu fenotüübis  
+
+H1: RNA tunnusega seotud kühmude hulgas on CTCF QTLd üleesindatud
+```{r include=FALSE}
+p_tabel = data.frame(matrix(ncol = 2, nrow = 5))
+colnames(p_tabel) <- c("0.8", "0.9")
+row.names(p_tabel) <- c("featureCounts", "upstream", "contained", "downstream", "kokku")
+
+p_tabel["featureCounts", "0.8"] = test_rida(tabel08, "featureCounts")
+p_tabel["upstream", "0.8"] = test_rida(tabel08, "upstream")
+p_tabel["contained", "0.8"] = test_rida(tabel08, "contained")
+p_tabel["downstream", "0.8"] = test_rida(tabel08, "downstream")
+p_tabel["kokku", "0.8"] = test_rida(tabel08, "kokku")
+
+
+p_tabel["featureCounts", "0.9"] = test_rida(tabel09, "featureCounts")
+p_tabel["upstream", "0.9"] = test_rida(tabel09, "upstream")
+p_tabel["contained", "0.9"] = test_rida(tabel09, "contained")
+p_tabel["downstream", "0.9"] = test_rida(tabel09, "downstream")
+p_tabel["kokku", "0.9"] = test_rida(tabel09, "kokku")
+```
+
+```{r}
+p_tabel
+```
+
+
+```{r include=FALSE}
+test_RNAtunnused = function(higher, lower, tabel){
+  return(fisher.test(rbind(c(tabel[higher, "RNA_CTCF"], tabel[lower, "RNA_CTCF"]),c(tabel[higher, "RNA_no_CTCF"], tabel[lower, "RNA_no_CTCF"])), alternative="less")$p.value)
+}
+```
+
+
+
+```{r include=FALSE}
+test_tabel = function(tabel){
+  
+  p_tabel <- data.frame(matrix(ncol = 4, nrow = 4))
+  colnames(p_tabel) <- c("featureCounts", "upstream", "contained", "downstream")
+  row.names(p_tabel) <- c("featureCounts", "upstream", "contained", "downstream")
+  
+  p_tabel["featureCounts", "upstream"] = test_RNAtunnused("featureCounts", "upstream", tabel)
+  p_tabel["featureCounts", "contained"] = test_RNAtunnused("featureCounts", "contained", tabel)
+  p_tabel["featureCounts", "downstream"] = test_RNAtunnused("featureCounts", "downstream", tabel)
+  
+  p_tabel["upstream", "featureCounts"] = test_RNAtunnused("upstream", "featureCounts", tabel)
+  p_tabel["upstream", "contained"] = test_RNAtunnused("upstream", "contained", tabel)
+  p_tabel["upstream", "downstream"] = test_RNAtunnused("upstream", "downstream", tabel)
+  
+  p_tabel["contained", "featureCounts"] = test_RNAtunnused("contained", "featureCounts", tabel)
+  p_tabel["contained", "upstream"] = test_RNAtunnused("contained", "upstream", tabel)
+  p_tabel["contained", "downstream"] = test_RNAtunnused("contained", "downstream", tabel)
+  
+  p_tabel["downstream", "upstream"] = test_RNAtunnused("downstream", "upstream", tabel)
+  p_tabel["downstream", "contained"] = test_RNAtunnused("downstream", "contained", tabel)
+  p_tabel["downstream", "featureCounts"] = test_RNAtunnused("downstream", "featureCounts", tabel)
+  
+  print(p_tabel)
+}
+```
+
+#### Kas CTCF QTLga seotud caQTL mõjutab suurema tõenäosusega näiteks splaissimist kui geeniekspressiooni? 
+
+H0: mõlemat tüüpi RNA taseme tunnusega seotud kühmude hulgas leidub võrdne osakaal ülekatet CTCF QLTdega  
+
+H1: Veerus oleva RNA tunnuse puhul on CTCF QTLdega seotud kühmude osakaal suurem
+```{r}
+test_tabel(tabel08)
+```
+```{r}
+test_tabel(tabel09)
+```
+
+
