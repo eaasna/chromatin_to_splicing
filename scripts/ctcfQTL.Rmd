@@ -180,7 +180,7 @@ p_tabel
 
 ```{r include=FALSE}
 test_RNAtunnused = function(higher, lower, tabel){
-  return(fisher.test(rbind(c(tabel[higher, "RNA_CTCF"], tabel[lower, "RNA_CTCF"]),c(tabel[higher, "RNA_no_CTCF"], tabel[lower, "RNA_no_CTCF"])), alternative="less")$p.value)
+  return(fisher.test(rbind(c(tabel[lower, "RNA_CTCF"], tabel[higher, "RNA_CTCF"]),c(tabel[lower, "RNA_no_CTCF"], tabel[lower, "RNA_no_CTCF"])), alternative="less")$p.value)
 }
 ```
 

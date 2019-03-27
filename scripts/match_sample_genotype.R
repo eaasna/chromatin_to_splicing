@@ -1,11 +1,11 @@
 #Secondary sample accession data currently used for naming bam files
-samples_list = read.table("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/QC_measures/sample_accession.txt")
+#siin on 100 proovi, 91 neist on Phase III. Teised jätan kõrvale 
+samples_list = read.table("/gpfs/hpchome/a72094/rocket/projects/chromatin_to_splicing/QC_measures/sample_accession.txt")
 
-sink("output.txt")
+sink("/gpfs/hpchome/a72094/rocket/projects/chromatin_to_splicing/QC_measures/run_sample_accession.txt")
 for (i in 1:length(samples_list[,1])){
   sample = as.character(samples_list[i,1])
-#bam_filename = paste("/gpfs/hpchome/a72094/rocket/projects/chromatin_to_splicing/bamstat/",sample, ".bamstat.txt", sep ="")
-  bamstat = read.table(paste("/gpfs/hpchome/evelin95/bamstat/", sample, ".bamstat.txt", sep=""), header=TRUE)
+  bamstat = read.table(paste("/gpfs/hpchome/a72094/rocket/projects/chromatin_to_splicing/bamstat/",sample, ".bamstat.txt", sep =""))
 
   full = dplyr::transmute(bamstat, SampleID = bamstat$SampleID, hom_consistency=bamstat$n_hom_consistent/bamstat$n_hom_covered, het_consistency=bamstat$n_het_consistent/bamstat$n_het_covered)
   full = dplyr::mutate(full, total_consistency=full$hom_consistency+full$het_consistency)

@@ -42,3 +42,22 @@ plot = ggplot(data=full) +
   labs(x = "CQN", y = "FPKM", title = "1 proov")
 print(plot)
 
+
+# Bed file necessary columns 
+# Chromosome ID [string] -> Chr
+# Start genomic position of the phenotype -> Start 
+# End genomic position of the phenotype -> End
+# Phenotype ID -> ATAC_peak_1 Gene_id
+# Phenotype group ID -> ATAC_peak_1 Gene_id
+# Strand orientation [+/-] -> +
+
+
+ctcf = read.table("/gpfs/hpchome/a72094/rocket/projects/chromatin-QTLs/Blood_ATAC/processed/CTCF/qtltools/output/cqn/CTCF.permuted.txt.gz")
+ctcf_bed = data.frame(matrix(ncol = 4, nrow = dim(ctcf)[1]))
+ctcf_bed = ctcf[,c(2,3, 4)]
+
+write.table(ctcf_bed,"/gpfs/hpchome/a72094/rocket/projects/chromatin_to_splicing/CTCF/CTCF.bed", col.names = F, quote = F, row.names = F, append = F, sep = '\t')
+
+
+
+

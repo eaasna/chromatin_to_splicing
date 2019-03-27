@@ -1,5 +1,5 @@
 ---
-title: "ENCODE HP1 seondumissaidid"
+title: "ENCODE CTCF seondumissaidid"
 output:
   pdf_document: default
   html_notebook: default
@@ -23,9 +23,9 @@ caQTL = read.table("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/tabi
 
 ```{r include = FALSE}
 # ENCODE CTCF seondumissaidid
-#tf_file = "/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/CTCF/ENCFF960ZGP.sorted.bed.gz"
-#tf = read.table(tf_file)
-#bindingsites <- GRanges(seqnames = tf$V1, strand = c("*"), ranges = IRanges(start = tf$V2, end = tf$V3))
+tf_file = "/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/CTCF/ENCFF960ZGP.sorted.bed.gz"
+tf = read.table(tf_file)
+bindingsites <- GRanges(seqnames = tf$V1, strand = c("*"), ranges = IRanges(start = tf$V2, end = tf$V3))
 ```
 
 
@@ -36,12 +36,11 @@ tf = read.table(tf_file)
 bindingsites <- GRanges(seqnames = tf$V1, strand = c("*"), ranges = IRanges(start = tf$V2, end = tf$V3))
 ```
 
-
 ```{r include = FALSE}
 #CTCF QTLtools seondumissaidid
-#tf_file = "/gpfs/hpchome/a72094/rocket/projects/chromatin-QTLs/Blood_ATAC/processed/CTCF/qtltools/output/cqn/CTCF.permuted.txt.gz" # kõik seondumiskohad
-#tf = read.table(tf_file)
-#bindingsites <- GRanges(seqnames = tf$V2, strand = c("*"), ranges = IRanges(start = tf$V3, end = tf$V4, names = tf$V1))
+tf_file = "/gpfs/hpchome/a72094/rocket/projects/chromatin-QTLs/Blood_ATAC/processed/CTCF/qtltools/output/cqn/CTCF.permuted.txt.gz" # kõik seondumiskohad
+tf = read.table(tf_file)
+bindingsites <- GRanges(seqnames = tf$V2, strand = c("*"), ranges = IRanges(start = tf$V3, end = tf$V4, names = tf$V1))
 ```
 
 
@@ -151,7 +150,7 @@ p_tabel
 
 ```{r include=FALSE}
 test_RNAtunnused = function(higher, lower, tabel){
-  return(fisher.test(rbind(c(tabel[higher, "RNA_TF"], tabel[lower, "RNA_TF"]),c(tabel[higher, "RNA_no_TF"], tabel[lower, "RNA_no_TF"])), alternative="less")$p.value)
+  return(fisher.test(rbind(c(tabel[lower, "RNA_TF"], tabel[higher, "RNA_TF"]),c(tabel[lower, "RNA_no_TF"], tabel[higher, "RNA_no_TF"])), alternative="less")$p.value)
 }
 ```
 

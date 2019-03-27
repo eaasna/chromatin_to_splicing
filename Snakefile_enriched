@@ -1,0 +1,59 @@
+#Make tab separated file from QTLtools output
+rule tab_separate:
+	input:
+		"{dataset}/results/rsquared08/cqn_{sub}_enriched.txt"
+	output:
+		"{dataset}/results/rsquared08/cqn_{sub}_enriched.tab.txt"
+	resources:
+		mem = 2000
+	threads: 1
+	shell:
+		"""
+		module load samtools-1.6
+		cat {input} | awk -v OFS='\t' '{{$1=$1; print $0}}' > {output}
+		"""
+	
+#Sort QTLtools output file by SNP position(QTLtools output from zenodo)
+rule sort_qtltools_output:
+	input:
+		"{dataset}/results/rsquared08/cqn_{sub}_enriched.tab.txt"
+	output:
+		protected("{dataset}/results/rsquared08/cqn_{sub}_enriched.sorted.txt.gz")
+	resources:
+		mem = 12000
+	threads: 20
+	shell:
+		"""
+		module load samtools-1.6
+		LANG=C sort --parallel=20 -k9,9n -k10,10n -k11,11n {input} | bgzip > {output}
+		rm {input}
+		"""
+
+#vanilla QTLtools output 9, 10, 11 <- variant chr, start, end		
+#featureCounts/txrevise 11, 12, 13 <- variant chr, start, end 
+		
+#Tabix-index QTLtools output files
+rule index_qtltools_output:
+	input:
+		"{dataset}/results/rsquared08/cqn_{sub}_enriched.sorted.txt.gz"
+	output:
+		"{dataset}/results/rsquared08/cqn_{sub}_enriched.sorted.txt.gz.tbi"
+	resources:
+		mem = 4000
+	threads: 1
+	shell:
+		"""
+		module load samtools-1.6
+		tabix -s9 -b10 -e11 -f {input}
+		"""
+		
+rule make_all:
+	input:
+		expand("{dataset}/results/rsquared08/cqn_{sub}_enriched.sorted.txt.gz.tbi", dataset=config["path"], sub=config["sub"])
+	output:
+		"out.txt"
+	resources:
+		mem = 100
+	threads: 1
+	shell:
+		"echo 'Done' > {output}"
