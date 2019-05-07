@@ -1,0 +1,307 @@
+---
+title: "Joonised"
+output: html_notebook
+---
+```{r}
+path = "/gpfs/hpchome/a72094/rocket/projects/chromatin_to_splicing/"
+library("dplyr")
+library("readr")
+library("devtools")
+library("rtracklayer")
+library("wiggleplotr")
+library("GenomicRanges")
+library('Rsamtools')
+load_all("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/seqUtils/")
+```
+
+
+
+```{r}
+rm(list = ls())
+path =  "/gpfs/hpchome/a72094/rocket/projects/chromatin_to_splicing/"
+interesting = read.table(paste0(path, 'interesting.txt'), header = T)
+```
+
+```{r}
+library(ggplot2)
+plot_peak = function(peak){
+  return(ggplot(peak) + 
+  geom_rect(aes(xmin=peak_start, xmax=peak_end, ymin=0, ymax=2), colour="blue", fill = 'blue', alpha=0.3) +
+  geom_point(aes(x=peak_snp_pos, y=0, colour="blue" )) +
+  geom_rect(aes(xmin=ctcf_start, xmax=ctcf_end, ymin=0, ymax=2), colour="red", fill = 'red',alpha=0.3) +
+  geom_point(aes(x=ctcf_snp_pos, y=1, colour="red")) +
+  geom_rect(aes(xmin=gene_start-50, xmax=gene_end+50, ymin=0, ymax=2), colour="green", fill = 'green', alpha=0.3) +
+  geom_point(aes(x=gene_snp_pos, y=2, colour="green")) +
+    labs(title = peak$peak_id, x=paste('chr',peak$peak_chr)) + 
+    scale_colour_discrete(name = "", labels = c("CTCF", "RNA", "ATAC"))
+    )
+}
+```
+
+```{r}
+unique(interesting$peak_start)
+```
+
+
+# ATAC
+
+```{r}
+#proovid
+ATAC_sample_metadata = read.table(paste0(path,'QC_measures/run_sample_accession_PhaseIII.txt'))
+colnames(ATAC_sample_metadata) = c("sample_id", "genotype_id")
+ATAC_sample_metadata["condition_name"] = rep("naive", dim(ATAC_sample_metadata)[1])
+```
+
+```{r}
+#genotüübid
+vcf_file = readRDS(paste0(path, 'genotypes/Kumasaka_100_samples.merged.rds'))
+```
+
+
+```{r}
+if(FALSE){
+  ATAC_counts = read.table(paste0(path, "counts/counts_matrix.bed"), header = TRUE)
+  ATAC_peak_metadata = ATAC_counts[,c("pid","start", "end","Chr", "strand")]
+  colnames(ATAC_peak_metadata)[4] = "chr"
+  ATAC_meta_df = wiggleplotrConstructMetadata(ATAC_counts[,7:dim(ATAC_counts)[2]], ATAC_sample_metadata, paste0(path, "bigwig"), condition_name_levels = c("naive"))
+  rm(ATAC_counts)
+  write.table(ATAC_meta_df, paste0(path, 'ATAC_meta_df'), col.names = T, quote = F, row.names = F, append = T)
+  write.table(ATAC_peak_metadata, paste0(path, 'ATAC_peak_metadata'), col.names = T, quote = F, row.names = F, append = T)
+}
+
+```
+
+```{r}
+ATAC_meta_df = read.table(paste0(path, 'ATAC_meta_df'), header = TRUE)
+ATAC_peak_metadata = read.table(paste0(path,'ATAC_peak_metadata'), header = TRUE)
+```
+
+
+
+Potentsiaalsed joonised ATAC_peak_163783, ATAC_peak_163781, ATAC_peak_190750, ATAC_peak_217971, ATAC_peak_257614
+```{r}
+plotted_peaks = interesting[which(interesting$peak_id %in% c('ATAC_peak_163783', 'ATAC_peak_163781', 'ATAC_peak_190750', 'ATAC_peak_217971', 'ATAC_peak_257614')),]
+plotted_peaks
+```
+
+
+```{r}
+regions_df = data.frame(chr = c(4, 5, 7, 22, 22), start=unique(plotted_peaks$peak_start), end = unique(plotted_peaks$peak_end), rs_id=unique(plotted_peaks$peak_snpid))
+regions_df
+```
+
+
+```{r}
+interesting = read.table(paste0(path, 'interesting.txt'), header = T)
+```
+
+
+```{r}
+plotlist = list()
+for (i in 1:dim(interesting)[1]){
+  general_plot = plot_peak(interesting[i,])
+  plotlist[[i]] = general_plot
+  print(general_plot)
+}
+```
+
+
+
+```{r}
+regions_df = unique(interesting[,c('peak_id', 'peak_chr','peak_start', 'peak_end','peak_snpid')])
+colnames(regions_df) = c('peak_id', 'chr', 'start', 'end', 'rs_id')
+regions_df
+```
+
+ATAC joonised
+```{r}
+ATAC_coverage_plotlist = list()
+ATAC_peak_plotlist = list()
+
+joint_plotlist = list()
+
+for (i in 1:dim(regions_df)[1]){
+  rs_id = regions_df[i, 'rs_id']
+  region_coords=c(regions_df[i,'start']-1000, regions_df[i,'end']+1000)
+  chr = regions_df[i,'chr']
+  ATAC_peak_annot = wiggleplotrExtractPeaks(region_coords, chrom = chr, ATAC_peak_metadata)
+  
+  # add colour group
+  colour_group = data.frame(genotype_id = names(vcf_file$genotypes[rs_id,]), colour_group=vcf_file$genotypes[rs_id,])
+  ATAC_track_data = dplyr::left_join(ATAC_meta_df, colour_group, by='genotype_id') %>% dplyr::mutate(track_id = "ATAC-seq")
+  ATAC_track_data[, 'colour_group'] = as.factor(ATAC_track_data[, 'colour_group'])
+  
+  ATAC_coverage = plotCoverage(exons = ATAC_peak_annot$peak_list, cdss = ATAC_peak_annot$peak_list, track_data = ATAC_track_data, rescale_introns = FALSE, 
+                             transcript_annotations = ATAC_peak_annot$peak_annot, fill_palette = getGenotypePalette(),
+                             connect_exons = FALSE, transcript_label = FALSE, plot_fraction = 0.1, heights = c(0.7,0.3), 
+                             region_coords = region_coords, return_subplots_list = TRUE, coverage_type = "line")
+  
+  
+  joint_plot = cowplot::plot_grid(ATAC_coverage$coverage_plot, 
+                                ATAC_coverage$tx_structure,
+                                align = "v", ncol = 1, rel_heights = c(3,2))
+  
+  ATAC_coverage_plotlist[[i]] = ATAC_coverage$coverage_plot
+  ATAC_peak_plotlist[[i]] = ATAC_coverage$tx_structure
+  joint_plotlist[[i]] = joint_plot
+  
+}
+```
+
+
+
+```{r}
+for (i in 1:length(joint_plotlist)) {
+    print(joint_plotlist[i])
+    ggsave(paste0('/gpfs/hpchome/evelin95/plots/',regions_df[i,'peak_id'],'.pdf'))
+}
+```
+
+
+```{r}
+rm(vcf_file,ATAC_counts)
+```
+
+# CTCF
+
+Potentsiaalsed joonised ATAC_peak_163783, ATAC_peak_163781, ATAC_peak_190750, ATAC_peak_217971, ATAC_peak_257614
+```{r}
+interesting[which(interesting$peak_id %in% c('ATAC_peak_163783', 'ATAC_peak_163781', 'ATAC_peak_190750', 'ATAC_peak_217971', 'ATAC_peak_257614')),]
+```
+
+
+```{r}
+CTCF_peak_metadata = ctcf[,c("V1","V2", "V3","V4", "V5")]
+colnames(CTCF_peak_metadata) = c("pid","chr","start", "end","strand")
+```
+
+```{r}
+interesting
+```
+
+
+```{r}
+CTCF_peak_annot = wiggleplotrExtractPeaks(region_coords, chrom = 7, CTCF_peak_metadata)
+CTCF_peak_annot$peak_annot$transcript_id='CTCF'
+CTCF_peak_annot$peak_annot$gene_id = 'CTCF'
+CTCF_peak_annot$peak_annot$gene_name = 'CTCF CHiP-seq'
+names(CTCF_peak_annot$peak_list) = 'CTCF'
+```
+
+```{r}
+CTCF_peak_plot = plotTranscripts(CTCF_peak_annot$peak_list, CTCF_peak_annot$peak_list, CTCF_peak_annot$peak_annot, rescale_introns = FALSE, 
+                                   region_coords = region_coords, connect_exons = FALSE, transcript_label = FALSE)
+CTCF_peak_plot
+```
+
+# RNA
+```{r}
+RNA_sample_metadata = read.table("/gpfs/hpchome/a72094/hpc/datasets/controlled_access/SampleArcheology/studies/cleaned/GEUVADIS.tsv", header = TRUE)[,c("sample_id","genotype_id","condition")]
+colnames(RNA_sample_metadata)[3] = "condition_name"
+```
+
+```{r}
+# RNA seq lugemite arv used for calculating library size
+RNA_counts = read.table("/gpfs/hpchome/a72094/hpc/projects/RNAseq_pipeline/results/expression_matrices/featureCounts/GEUVADIS.tsv.gz", header = TRUE)
+RNA_meta_df = wiggleplotrConstructMetadata(RNA_counts, RNA_sample_metadata, "/gpfs/hpc/home/a72094/projects/RNAseq_pipeline/processed/GEUVADIS/bigwig", bigWig_suffix = ".str1.bw", condition_name_levels = c("naive"))
+rm(RNA_counts)
+```
+
+
+```{r}
+regions_df = unique(interesting[,c('gene_id', 'peak_chr','gene_start', 'gene_end','gene_snpid','gene_snp_pos')])
+colnames(regions_df) = c('gene_id', 'chr', 'start', 'end', 'rs_id', 'pos')
+regions_df
+```
+
+# eraldan vcf failist ainult vajalike rs_id genotuubid
+```{r}
+library(SNPRelate)
+gds_file = paste0(path, "genotypes/GEUVADIS_GRCh38_filtered.gds")
+snpgdsVCF2GDS(paste0(path, "genotypes/GEUVADIS_GRCh38_filtered.vcf.gz"), gds_file)
+vcf_file=gdsToMatrix(gds_file)
+```
+
+
+```{r}
+vcf_df = read.table(paste0(path, 'RNA_vcf_df'), header = T)
+```
+
+
+```{r}
+rs_id = 'rs7287579'
+vcf_id = as.character(vcf_file$snpspos[which(vcf_file$snpspos$chr == 22 & vcf_file$snpspos$pos == 49927975),'snpid'])
+genotype = vcf_file$genotypes[vcf_id,]
+#vcf_df = data.frame(genotype_id = names(vcf_file$genotypes[vcf_id,]), rs1532194 = genotype)
+vcf_df$rs7287579 = genotype
+```
+
+
+
+```{r}
+write.table(vcf_df, paste0(path, 'RNA_vcf_df'), col.names = T, quote = F, row.names = F, append = F)
+```
+
+
+```{r}
+# RNA metadata
+RNA_peak_metadata = read.table("/gpfs/hpchome/a72094/hpc/projects/RNAseq_pipeline/metadata/gene_metadata/featureCounts_Ensembl_92_gene_metadata.txt.gz", header = TRUE)[,c("phenotype_id", "chromosome","gene_start","gene_end")]
+colnames(RNA_peak_metadata) = c("pid","chr","start", "end")
+RNA_peak_metadata$strand = rep("*",dim(RNA_peak_metadata)[1])
+```
+
+
+
+
+```{r}
+regions_df
+```
+
+
+
+Leia koik geenid selles vahemikus
+```{r}
+region_coords = c(49922855-2000, 49922854+2000)
+gene_id = 'ENSG00000184164'
+chr = 22
+```
+
+
+
+```{r}
+RNA_peak_annot = wiggleplotrExtractPeaks(region_coords, chrom = chr, RNA_peak_metadata)
+RNA_peak_annot$peak_annot$transcript_id='RNA'
+RNA_peak_annot$peak_annot$gene_id = 'RNA'
+RNA_peak_annot$peak_annot$gene_name = 'RNA-seq'
+names(RNA_peak_annot$peak_list) = 'RNA'
+
+# lisan mock range
+RNA_peak_annot$peak_list$RNA = GRanges(seqnames = chr, strand = c("*"), ranges = IRanges(start = region_coords[1]+1, end=region_coords[2]-1))
+```
+
+
+```{r}
+# add colour group
+colour_group = data.frame(genotype_id = vcf_df$genotype_id, colour_group=vcf_df$rs7287579)
+RNA_track_data = dplyr::left_join(RNA_meta_df, colour_group, by='genotype_id') %>% dplyr::mutate(track_id = "RNA-seq")
+RNA_track_data[, 'colour_group'] = as.factor(RNA_track_data[, 'colour_group'])
+RNA_track_data=RNA_track_data[complete.cases(RNA_track_data), ]
+```
+
+```{r}
+RNA_track_data
+```
+
+```{r}
+RNA_coverage = plotCoverage(exons = RNA_peak_annot$peak_list, cdss = RNA_peak_annot$peak_list, track_data = RNA_track_data, rescale_introns = FALSE, 
+                            transcript_annotations = RNA_peak_annot$peak_annot, fill_palette = getGenotypePalette(),
+                            connect_exons = FALSE, transcript_label = FALSE, plot_fraction = 0.1, heights = c(0.7,0.3), 
+                            region_coords = region_coords, return_subplots_list = TRUE, coverage_type = "line")
+```
+
+```{r}
+library(ggplot2)
+RNA_coverage$coverage_plot
+ggsave(paste0('/gpfs/hpchome/evelin95/plots/',gene_id,'.pdf'))
+```
+

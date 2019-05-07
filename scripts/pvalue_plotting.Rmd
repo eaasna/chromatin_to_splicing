@@ -1,0 +1,161 @@
+---
+title: "P-väärtuste uurimine"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+```{r include=FALSE}
+library(readr)
+library(Rsamtools)
+library(dplyr)
+library(ggplot2)
+```
+
+```{r}
+path = "/gpfs/hpchome/a72094/rocket/projects/chromatin_to_splicing/"
+```
+
+Kõik kromatiini avatuse kühmud, millel on FDR<0.1 QTL
+```{r}
+ca = read.table(paste(path, "tabix/cqn_permutations_100000_significant.sorted.txt.gz", sep=""))
+```
+
+
+Kõik Yurii Toma CTCF seondumiskohad
+```{r}
+ctcf = read.table("/gpfs/hpchome/a72094/rocket/projects/chromatin-QTLs/Blood_ATAC/processed/CTCF/qtltools/output/cqn/CTCF.permuted.txt.gz")
+bindingsites <- GRanges(seqnames = ctcf$V2, strand = c("*"), ranges = IRanges(start = ctcf$V3, end = ctcf$V4, names = ctcf$V1))
+```
+
+
+Kromatiini avatuse kühmud, mille QTL paikneb CTCF seondumiskohas
+```{r}
+caQTL = GRanges(seqnames = ca$V9, strand = c("*"), ranges = IRanges(start = ca$V10, end = ca$V11, names = ca$V8))
+caQTL_in_bindingsite = subsetByOverlaps(caQTL, bindingsites)
+caQTL_CTCF = ca[which(ca$V8 %in% names(caQTL_in_bindingsite)), ]
+```
+
+Kromatiini avatuse kühmud, mis paiknevad CTCF seondumiskohas
+```{r}
+ca_peaks = GRanges(seqnames = ca$V2, strand = c("*"), ranges = IRanges(start = ca$V3, end = ca$V4, names = ca$V1))
+ca_in_bindingsite = subsetByOverlaps(ca_peaks, bindingsites)
+ca_peak_CTCF = ca[which(ca$V1 %in% names(ca_in_bindingsite)), ]
+```
+
+
+Lookused, mis on seotud kromatiin avatuse ja CTCF seondumisega
+```{r}
+# V4 on ctcf QTLd
+r2 = read.table(paste(path, "results/ctcf/cqn_rsq08.txt",sep=""))
+# kontroll
+ctcfQTL = read.table(paste(path,"CTCF/CTCF.permuted.significant.sorted.txt.gz", sep = ""))
+#ctcfQTL[which(ctcfQTL$V8 %in% r2$V4),]
+```
+
+Kromatiini avatuse kühmud, mille QTL seotud CTCF QTLga
+```{r}
+ca_r2 = ca[which(ca$V8 %in% r2$V1), ]
+```
+
+```{r}
+dim(ctcf)
+```
+
+
+```{r}
+dim(ca_r2)
+```
+
+
+Ühendan kolme tüüpi kromatiini avatuse kühmude p-väärtused. P-väärtus näitab kui tugevalt on seotud genotüüp lookuses ja kromatiini avatus ühes kühmus
+```{r}
+ca_values<-abs(ca[,"V17"])
+caQTL_CTCF_values<-abs(caQTL_CTCF[,"V17"])
+ca_r2_values<-abs(ca_r2[,"V17"])
+ca_peak_CTCF_values<-abs(ca_peak_CTCF[,"V17"])
+#all<-data.frame(dataset=c(rep('all',length(ca_values)),rep('withinpeak',length(caQTL_CTCF_values)), rep('r2',length(ca_r2_values)), rep('CTCF',length(ca_peak_CTCF_values))),value=c(ca_values,caQTL_CTCF_values, ca_r2_values, ca_peak_CTCF_values))
+all<-data.frame(dataset=c(rep('all',length(ca_values)), rep('r2',length(ca_r2_values)), rep('CTCF',length(ca_peak_CTCF_values))),value=c(ca_values,ca_r2_values, ca_peak_CTCF_values))
+```
+
+Grupeerin ja lisan õige järjekorra
+```{r}
+all %>%
+  group_by(dataset) %>%
+  mutate(meanp = mean(value)) -> all
+
+#all = transform(all, dataset = factor(dataset, levels=c("all","CTCF","withinpeak","r2")))
+all = transform(all, dataset = factor(dataset, levels=c("all","CTCF","r2")))
+```
+
+
+
+```{r}
+#labels <- c(all = "Kõik lookused", withinpeak = "CTCF seondumiskohas paiknevad lookused", r2 = "CTCF QTLga seotud lookused", CTCF = "Lookused, mis mõjutavad CTCF seondumiskohas paiknevat kühmu")
+labels <- c(all = "Kõik lookused", r2 = "CTCF QTLga seotud lookused", CTCF = "Lookused, mis mõjutavad CTCF seondumiskohas paiknevat kühmu")
+```
+
+
+Tihedusfunktsioon, milles iga joone alune pindala = 1
+```{r}
+ggplot(all,aes(x=value, color=dataset, fill = dataset))+
+  geom_density(aes(x=value)) +
+  geom_vline(aes(xintercept=meanp), colour="grey50") +
+  facet_wrap(~dataset,nrow=4, labeller = labeller(dataset = labels)) +
+  labs(x='tõusu absoluutväärtus', y='suhteline sagedus') +
+  scale_fill_discrete(guide = FALSE) +
+  scale_color_discrete(guide = FALSE) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank(), axis.line = element_line(colour = "black")) + ggsave("/gpfs/hpchome/evelin95/plots/p_value_density_labels_3.png")
+```
+
+
+Tihedusfunktsioon, milles joonealune pindala sõltub p-väärtuste(kühmude) arvust grupis
+```{r}
+ggplot(all,aes(x=value, color=dataset, fill = dataset))+
+  geom_density(aes(x=value, y = ..count..)) +
+  geom_vline(aes(xintercept=meanp), colour="grey50") +
+  facet_wrap(~dataset,nrow=4) +
+  theme(strip.background = element_blank(), strip.text = element_blank(), legend.position="top", legend.direction = "vertical")+ 
+  scale_fill_discrete(name = "", labels = c("Kõik lookused", "CTCF seondumiskohas paiknevad lookused", "Lookused, mis mõjutavad CTCF seondumiskohas paiknevat kühmu", "CTCF QTLga seotud lookused")) +
+  scale_color_discrete(guide = FALSE) +
+  labs(x='regresioonisirge tõusu absoluutväärtus', y='sagedus') 
+#+ ggsave("/gpfs/hpchome/evelin95/plots/p_value_density_legend.png")
+```
+Tihedusfunktsioon, milles joonealune pindala sõltub p-väärtuste(kühmude) arvust grupis
+```{r}
+ggplot(all,aes(x=value, color=dataset, fill = dataset))+
+  geom_density(aes(x=value, y = ..count..)) +
+  geom_vline(aes(xintercept=meanp), colour="grey20") +
+  facet_wrap(~dataset,nrow=4, labeller = labeller(dataset = labels)) +
+  scale_fill_discrete(guide = FALSE) +
+  scale_color_discrete(guide = FALSE) +
+  labs(x='regresioonisirge tõusu absoluutväärtus', y='sagedus') + 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank(), axis.line = element_line(colour = "black"))  + ggsave("/gpfs/hpchome/evelin95/plots/p_value_total_labels_3.png")
+```
+
+
+```{r}
+ggplot(all,aes(x=value,fill=dataset))+
+  geom_histogram(aes(y=.001*..density..) ,position='identity', binwidth = .001) +
+  geom_vline(aes(xintercept=meanp), colour="grey50") +
+  facet_wrap(~dataset,nrow=3) +
+  labs(x='p-väärtus', y='suhteline esinemissagedus', title='Suhtelise sageduse histogram')
+```
+
+```{r}
+ggplot(all,aes(x=value,fill=dataset))+
+  geom_histogram(aes(y=0.001*..density..),
+                 alpha=0.3,position='identity', binwidth = 0.001) +
+  labs(x='p-väärtus', y='tihedus', title='Tihedus ehk probability density')
+```
+
+
+```{r}
+ggplot(all, aes(x=value, fill=dataset)) + 
+  geom_density(color = "black", alpha = 0.3) + 
+  scale_fill_manual(values = c("#E69F00", "#56B4E9", "#EE08FF"))
+```
+
+

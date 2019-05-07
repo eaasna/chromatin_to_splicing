@@ -25,6 +25,7 @@ full$V19=p.adjust(full$V19, method = "fdr")
 write.table(full[which(full$V19 <= 0.1), ], "/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/CTCF/CTCF.permuted.significant.txt.gz", quote=FALSE, row.names=FALSE, col.names=FALSE)
 
 
+#QTLtools rerun failid
 #cat /gpfs/rocket/home/a72094/projects/chromatin_to_splicing/QTL_rerun/cqn_permutations_*_100_100000_pca_5.txt >  /gpfs/rocket/home/a72094/projects/chromatin_to_splicing/QTL_rerun/cqn_100_100000_5_full.txt
 
 perm = 100
