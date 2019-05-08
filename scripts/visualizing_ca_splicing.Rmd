@@ -129,12 +129,6 @@ RNA_meta_df
 ```
 
 
-```{r}
-regions_df = unique(filtered[,c('gene_id', 'peak_chr','gene_start', 'gene_end','gene_snpid','gene_snp_pos')])
-colnames(regions_df) = c('gene_id', 'chr', 'start', 'end', 'rs_id', 'pos')
-regions_df
-```
-
 geenide annotatsioonid ja transkriptide annotatsioonid
 ```{r}
 if (FALSE){
@@ -167,9 +161,9 @@ find_peak_annotations = function(region_coords, chr, RNA_peak_metadata){
 
 Leian vcf failist loigu, mis vastab uuritavale geenile
 ```{r}
-find_genotype = function(gene_id, region_coords){
+find_genotype = function(chr, gene_id, region_coords){
   library(GenomicRanges)
-  gene_range = GRanges(seqnames =filtered_annotations[which(filtered_annotations$type=='gene' & filtered_annotations$gene_id ==gene_id),'seqnames'], strand = c("*"), ranges = IRanges(start = region_coords[1], end = region_coords[2], names = gene_id))
+  gene_range = GRanges(seqnames=chr, strand = c("*"), ranges = IRanges(start = region_coords[1], end = region_coords[2], names = gene_id))
   vcf_file = paste0(path, 'genotypes/GEUVADIS_GRCh38_filtered.vcf.gz')
   genotype = scanTabixDataFrame(vcf_file, gene_range, col_names = FALSE)[[1]]
   #saveRDS(genotype, paste0(path, 'genotype'))
@@ -203,75 +197,125 @@ find_track_data = function(genotype, chr, RNA_meta_df){
 }
 ```
 
+```{r}
+gene_id
+```
+
+```{r}
+peak_list = c('ATAC_peak_267968', 'ATAC_peak_54976', 'ATAC_peak_67524', 'ATAC_peak_69070', 'ATAC_peak_80013', 'ATAC_peak_80296', 'ATAC_peak_99093', 'ATAC_peak_131391', 'ATAC_peak_160292', 'ATAC_peak_177080', 'ATAC_peak_190065', 'ATAC_peak_248105', 'ATAC_peak_270141')
+gene_list = c('ENSG00000010219', 'ENSG00000104714', 'ENSG00000089127', 'ENSG00000111450', 'ENSG00000187630', 'ENSG00000184304', 'ENSG00000103479', 'ENSG00000115956', 'ENSG00000241945', 'ENSG00000173200', 'ENSG00000121895', 'ENSG00000029639', 'ENSG00000184661')
+```
+
+
+```{r}
+regions_df = unique(interesting[,c('peak_id', 'peak_chr','peak_start', 'peak_end','peak_snpid','gene_id', 'peak_chr','gene_start', 'gene_end','gene_snpid','gene_snp_pos')])
+colnames(regions_df) = c('peak_id', 'peak_chr', 'peak_start', 'peak_end', 'peak_rs_id', 'gene_id', 'gene_chr', 'gene_start', 'gene_end', 'gene_rs_id', 'gene_pos')
+regions_df
+```
+
+```{r}
+regions_df = dplyr::filter(regions_df, regions_df$peak_id %in% peak_list & regions_df$gene_id %in% gene_list)
+regions_df
+```
+
 
 ATAC joonised
 ```{r}
+library(ggplot2)
+
 joint_plotlist = list()
 
-for (i in 1:dim(regions_df)[1]){
+for (i in 10:dim(regions_df)[1]){
+  i = 2
   ATAC_rs_id = regions_df[i, 'peak_rs_id']
+  peak_id = regions_df[i, 'peak_id']
   ATAC_region_coords=c(regions_df[i,'peak_start']-1000, regions_df[i,'peak_end']+1000)
   chr = regions_df[i,'peak_chr']
-  ATAC_peak_annot = wiggleplotrExtractPeaks(region_coords, chrom = chr, ATAC_peak_metadata)
   
-  # add colour group
-  ATAC_colour_group = data.frame(genotype_id = names(vcf_file$genotypes[ATAC_rs_id,]), colour_group=vcf_file$genotypes[rs_id,])
-  ATAC_track_data = dplyr::left_join(ATAC_meta_df, ATAC_colour_group, by='genotype_id') %>% dplyr::mutate(track_id = "ATAC-seq")
-  ATAC_track_data[, 'colour_group'] = as.factor(ATAC_track_data[, 'colour_group'])
-  
-  ATAC_coverage = plotCoverage(exons = ATAC_peak_annot$peak_list, cdss = ATAC_peak_annot$peak_list, track_data = ATAC_track_data, rescale_introns = FALSE, 
-                             transcript_annotations = ATAC_peak_annot$peak_annot, fill_palette = getGenotypePalette(),
-                             connect_exons = FALSE, transcript_label = FALSE, plot_fraction = 0.1, heights = c(0.7,0.3), 
-                             region_coords = ATAC_region_coords, return_subplots_list = TRUE, coverage_type = "line")
-  
-  
-  joint_plot = cowplot::plot_grid(ATAC_coverage$coverage_plot, 
-                                ATAC_coverage$tx_structure,
-                                align = "v", ncol = 1, rel_heights = c(3,2))
-  
-  joint_plotlist[[i]] = joint_plot
-  print(joint_plot)
-  ggsave(paste0('/gpfs/hpchome/evelin95/plots/ca_splicing/',regions_df[i,'peak_id'],'.pdf'))
-  
-}
-```
-
-RNA joonised
-```{r}
-library(ggplot2)
-RNA_joint_plotlist = list()
-for (i in 1:dim(regions_df)[1]){
   gene_rs_id = regions_df[i, 'gene_rs_id']
   pos = regions_df[i, 'gene_pos']
   gene_id = regions_df[i, 'gene_id']
-  gene_region_coords = c(filtered_annotations[which(filtered_annotations$type=='gene' & filtered_annotations$gene_id ==gene_id),'start'], filtered_annotations[which(filtered_annotations$type=='gene' & filtered_annotations$gene_id ==gene_id),'gene_end'])
-  chr = regions_df[i,'gene_chr']
+  gene_region_coords = c(filtered_annotations[which(filtered_annotations$type=='gene' & filtered_annotations$gene_id ==gene_id),'start'], filtered_annotations[which(filtered_annotations$type=='gene' & filtered_annotations$gene_id ==gene_id),'end'])
+  
   
   RNA_peak_metadata = filtered_annotations[which(filtered_annotations$type=='exon' & filtered_annotations$gene_id==gene_id),c("seqnames", "start", "end", "strand")]
   colnames(RNA_peak_metadata)[1]='chr'
+  genotype=find_genotype(chr, gene_id, gene_region_coords)
   
-  genotype=find_genotype(gene_id, gene_region_coords)
-  
+  ATAC_peak_annot = wiggleplotrExtractPeaks(ATAC_region_coords, chrom = chr, ATAC_peak_metadata)
   RNA_peak_annot = find_peak_annotations(gene_region_coords, chr, RNA_peak_metadata)
+  
+  # add colour group
+  ATAC_colour_group = data.frame(genotype_id = names(vcf_file$genotypes[ATAC_rs_id,]), colour_group=vcf_file$genotypes[ATAC_rs_id,])
+  ATAC_track_data = dplyr::left_join(ATAC_meta_df, ATAC_colour_group, by='genotype_id') %>% dplyr::mutate(track_id = "ATAC-seq")
+  ATAC_track_data[, 'colour_group'] = as.factor(ATAC_track_data[, 'colour_group'])
   RNA_track_data = find_track_data(genotype, chr, RNA_meta_df)
   
+  
+  #ainult eed geenid, mille juhtvariant on genotuubitud
   if (sum(is.na(RNA_track_data$colour_group))<100){
-  RNA_coverage = plotCoverage(exons = RNA_peak_annot$peak_list, cdss = RNA_peak_annot$peak_list, track_data = RNA_track_data, rescale_introns = TRUE, 
+    
+    ATAC_coverage = plotCoverage(exons = ATAC_peak_annot$peak_list, cdss = ATAC_peak_annot$peak_list, track_data = ATAC_track_data, rescale_introns = FALSE, 
+                             transcript_annotations = ATAC_peak_annot$peak_annot, fill_palette = getGenotypePalette(),
+                             connect_exons = FALSE, transcript_label = FALSE, plot_fraction = 0.1, heights = c(0.7,0.3), 
+                             region_coords = ATAC_region_coords, return_subplots_list = TRUE, coverage_type = "line")
+    
+    RNA_coverage = plotCoverage(exons = RNA_peak_annot$peak_list, cdss = RNA_peak_annot$peak_list, track_data = RNA_track_data, rescale_introns = TRUE, 
                              transcript_annotations = RNA_peak_annot$peak_annot, fill_palette = getGenotypePalette(),
                              connect_exons = FALSE, transcript_label = FALSE, plot_fraction = 0.1, heights = c(0.7,0.3), 
-                             region_coords = region_coords, return_subplots_list = TRUE, coverage_type = "line")
-  
-  
-  joint_plot = cowplot::plot_grid(RNA_coverage$coverage_plot, 
-                                RNA_coverage$tx_structure,
-                                align = "v", ncol = 1, rel_heights = c(3,2))
-
-  RNA_joint_plotlist[[i]] = joint_plot
-  print(joint_plot)
-  ggsave(paste0('/gpfs/hpchome/evelin95/plots/ca_splicing/',gene_id,'.pdf'))  
+                             region_coords = gene_region_coords, return_subplots_list = TRUE, coverage_type = "line")
+    
+    joint_plot = cowplot::plot_grid(ATAC_coverage$coverage_plot, 
+                                RNA_coverage$coverage_plot,
+                                ATAC_coverage$tx_structure,
+                                align = "v", nrow = 2, rel_heights = c(3, 1))
+                          
+    print(joint_plot)
+    
+    ggsave(paste0('/gpfs/hpchome/evelin95/plots/ca_splicing/',peak_id,'_',gene_id,'.pdf'))  
   }
+  
 }
 ```
 
+Vali valja parimad naited, grepi huvipakkuvad piigid nominal failist
+
+```{r}
+#Import overlapping promoters
+qtl_hits = dplyr::transmute(interesting, phenotype_id = peak_id, gene_snp_id)
+
+#Import genotypes
+vcf_file = readRDS(paste0(path, 'genotypes/Kumasaka_100_samples.merged.rds'))
+variant_information = importVariantInformation(paste0(path,"genotypes/Kumasaka_variantInformation.txt.gz"))
+```
+
+Kromatiini avatuse nominal p-vaartuste Manhattan plot
+```{r}
+peak_id = ??
+gene_snp_id = ??
+peak_snp_id = ??
+selected_hit = dplyr::filter(qtl_hits, phenotype_id == gene_id)[1,] 
+qtl_ranges = constructVariantRanges(selected_hit, variant_information, cis_dist = 1e6)
+qtl_path = paste0(path, 'QTL/cqn_nominal_full_txt.gz')
+
+qtl_pvalues = qtltoolsTabixFetchPhenotypes(qtl_ranges, qtl_path)[[1]] %>%
+  dplyr::mutate(track_id = "ATAC caQTL") %>%
+  dplyr::arrange(p_nominal) %>%
+  addR2FromLead(vcf_file$genotypes) %>%
+  dplyr::mutate(pos = snp_start) %>%
+  dplyr::mutate(lead_variant = ifelse(snp_id == gene_snp_id, "splaiss QTL", NA)) %>%
+  dplyr::mutate(lead_variant = ifelse(snp_id == peak_gene_id, "caQTL", lead_variant))
+region_coords2 = c(min(qtl_pvalues$pos), max(qtl_pvalues$pos))
+region_coords2 = c(241000000,241700000)
+peak_manhattan = makeManhattanPlot(qtl_pvalues, region_coords2, color_R2 = TRUE, data_track = FALSE) +
+  theme(strip.text.y = element_text(colour = "grey10"),
+        strip.background = element_rect(fill = "grey85"))
+
+#Add lead vars
+lead_vars = dplyr::filter(qtl_pvalues, !is.na(lead_variant))
+updated_manhattan = peak_manhattan + geom_point(data = lead_vars, color = "red")
+ggsave("results/figures/HDLBP_manhattan.pdf", plot = updated_manhattan, width = 5, height = 2)
+
+```
 
 

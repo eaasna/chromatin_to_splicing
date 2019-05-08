@@ -56,7 +56,7 @@ chrs = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 
 
 
 for (sub in c("upstream", "contained", "downstream", "featureCounts")){
-  # overap between ATAC peaks and RNA QTLs that is covered peaks
+  # overlap between ATAC peaks and RNA QTLs that is covered peaks
   #outfile = paste("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/results/rsquared", r_str, "/cqn_txrevise_", sub, "_rsq.txt", sep ="")
   #eqtl_file = paste("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/tabix/txrevise.significant.", sub, ".sorted.txt.gz", sep="")
   #ca_file = "/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/tabix/cqn_permutations_100000_significant.sorted.txt.gz"
