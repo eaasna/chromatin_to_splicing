@@ -45,6 +45,7 @@ plot_QTL <- function(SNP, peak, pos, ref, alt){
   library(data.table)
   smallest_genotype = setDT(as.data.frame(genotypes$genotypes[SNP,]), keep.rownames = TRUE)[]
   colnames(smallest_genotype) <- c("sample", "genotype")
+  
   smallest_openness = setDT(as.data.frame(t(atac[which(atac$pid == peak), 7:length(colnames(atac))])), keep.rownames = TRUE)[]
   colnames(smallest_openness) <- c("sample", "atac")
   smallest = na.omit(dplyr::right_join(smallest_genotype, smallest_openness, by = "sample"))
@@ -54,24 +55,48 @@ plot_QTL <- function(SNP, peak, pos, ref, alt){
   #lineaarne regressioon kromatiini avatuse ja genotüübi vahel
   fit = lm(formula = smallest$atac ~ smallest$genotype, data = smallest)
   
-  plot = ggplot(data=smallest) + 
-    geom_boxplot(mapping = aes(x = as.factor(genotype), y = atac, group = genotype)) + 
+  smallest$genotype = as.factor(smallest$genotype)
+  
+  plot = ggplot(data=smallest, aes(x = genotype, y = atac, color = genotype)) + 
+    geom_boxplot(mapping = aes(group = genotype)) +
+    scale_color_manual(values=c("darkblue", "skyblue", "red")) + 
+    geom_jitter() + 
     #labs(x = SNP, y = "kromatiini avatus", title = paste("p-väärtus: ",lmp(fit), sep="")) + 
-    labs(x = SNP, y = "kromatiini avatus", title = peak) + 
-    scale_x_discrete(labels=c(paste(ref, ref, sep=""), paste(ref, alt, sep=""), paste(alt, alt, sep="")))
-  #print(plot)
-  ggsave(paste("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/QTL/plots/", SNP ,".png", sep=""), width = 5, height = 5)
+    labs(x = paste0('Genotüüp (' , SNP, ")"), y = "Kromatiini avatus (CQN)", title = paste0(abs(start-end), " bp laiune ala kromosoomil ", chr)) + 
+    scale_x_discrete(labels=c(paste(ref, ref, sep=""), paste(ref, alt, sep=""), paste(alt, alt, sep=""))) +
+    theme_bw() +
+    guides(color=FALSE)
+  ggsave(paste("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/QTL/plots/", SNP ,".png", sep=""), plot = plot, width = 4, height = 4)
 }
 
 
-SNP = "rs11242436"
-peak = "ATAC_peak_223599"
+
+SNP = "rs2332287"
+peak = "ATAC_peak_177080"
+atac[which(atac$pid == peak), ]
+chr = 3
+start = 122646218
+end = 122646956
 # zgrep "rs11242436" Kumasaka_100_samples.merged.vcf.gz
 # leia manuaalselt
-ref = "A"
+ref = "C"
 alt = "G"
 plot_QTL(SNP, peak, pos, ref, alt)
 # QTL genotüübist sõltuv kromatiini avatus ühe kühmu juures
 
+
+
+SNP = "rs979878"
+peak = "ATAC_peak_54976"
+atac[which(atac$pid == peak), ]
+chr = 12
+start = 4648208
+end = 4648451
+# zgrep "rs11242436" Kumasaka_100_samples.merged.vcf.gz
+# leia manuaalselt
+ref = "G"
+alt = "A"
+plot_QTL(SNP, peak, pos, ref, alt)
+# QTL genotüübist sõltuv kromatiini avatus ühe kühmu juures
 
 

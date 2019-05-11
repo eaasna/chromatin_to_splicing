@@ -1,0 +1,196 @@
+---
+title: "kromatiin nominal p-vaartused"
+output: html_notebook
+---
+
+
+```{r}
+rm(list = ls())
+```
+
+
+```{r}
+path = "/gpfs/hpchome/a72094/rocket/projects/chromatin_to_splicing/"
+library("dplyr")
+library("ggplot2")
+library("devtools")
+library("wiggleplotr")
+
+load_all("/gpfs/rocket/home/a72094/projects/chromatin_to_splicing/seqUtils/")
+```
+
+```{r}
+peak_list = c('ATAC_peak_54976', 'ATAC_peak_177080')
+gene_list = c('ENSG00000010219', 'ENSG00000173200')
+```
+
+```{r}
+interesting = read.table(paste0(path, 'interesting.txt'), header = TRUE)
+```
+
+
+Vali valja parimad naited, grepi huvipakkuvad piigid nominal failist
+```{r}
+#Import genotypes
+vcf_file = readRDS(paste0(path, 'genotypes/Kumasaka_100_samples.merged.rds'))
+genotype = vcf_file$genotypes
+rm(vcf_file)
+```
+
+
+```{r}
+variant_information = importVariantInformation(paste0(path, 'genotypes/Kumasaka_variantInformation.txt.gz'))
+variant_information = filter(variant_information, chr %in% c(3, 12))
+variant_information
+```
+
+
+
+```{r}
+variant_information[which(variant_information$snp_id==peak_snp_id),]
+```
+
+```{r}
+peak_snp_id
+```
+
+
+```{r}
+peak_id = 'ATAC_peak_54976'
+chr = 12
+gene_snp_id = as.character(interesting[which(interesting$peak_id==peak_id), 'gene_snpid'])
+gene_snp_pos = interesting[which(interesting$peak_id==peak_id), 'gene_snp_pos']
+peak_snp_id = as.character(interesting[which(interesting$peak_id==peak_id), 'peak_snpid'])
+peak_snp_pos = interesting[which(interesting$peak_id==peak_id), 'peak_snp_pos']
+```
+
+
+
+
+```{r}
+head(interesting)
+```
+
+```{r}
+peak_snp_id
+```
+
+
+
+Kromatiini avatuse nominal p-vaartuste Manhattan plot
+```{r}
+qtl = read.table(paste0(path, 'QTL/', peak_id))
+qtl_pvalues = data.frame(track_id = qtl$V8, p_nominal = qtl$V12, pos = qtl$V10) 
+qtl_pvalues$lead_variant = NA
+qtl_pvalues[which(qtl_pvalues$track_id==gene_snp_id), 'lead_variant']='sQTL'
+qtl_pvalues[which(qtl_pvalues$track_id==peak_snp_id), 'lead_variant']='caQTL'
+qtl_pvalues$track_id = as.character(qtl_pvalues$track_id)
+```
+
+```{r}
+rsq <- function(rs_id){
+  if (rs_id	 %in% row.names(genotype)) { 
+    return(cor(genotype[rs_id,], genotype[peak_snp_id,]) ^ 2)  
+    } 
+  else {
+    return(NA)
+  }
+}
+```
+
+
+```{r}
+filter(qtl_pvalues, !is.na(lead_variant))
+```
+
+
+```{r}
+r2 = sapply(qtl_pvalues$track_id, rsq)
+r2[1:10]
+```
+
+
+```{r}
+is.vector(r2)
+```
+
+```{r}
+qtl_pvalues = dplyr::mutate(qtl_pvalues, R2 = r2)
+```
+
+
+
+```{r}
+region_coords2 = c(min(qtl_pvalues$pos), max(qtl_pvalues$pos))
+#Add lead vars
+lead_vars = dplyr::filter(qtl_pvalues, !is.na(lead_variant))
+```
+
+
+
+```{r}
+#rsq(gene_snp_id)
+```
+
+```{r}
+lead_vars
+```
+
+```{r}
+#qtl_pvalues = readRDS(paste0(path, 'qtl_pvalues'))
+```
+
+```{r}
+print(dim(qtl_pvalues))
+qtl_pvalues = qtl_pvalues[complete.cases(qtl_pvalues[,c('R2')]),]
+print(dim(qtl_pvalues))
+```
+
+
+```{r}
+manhattan = ggplot(qtl_pvalues, aes(x = pos, y = -log(p_nominal, 10), colour = R2)) +
+  geom_point() +
+  geom_point(x = lead_vars[1,'pos'], y = -log(lead_vars[1,'p_nominal'],10), color = 'red') +
+  geom_point(x = lead_vars[2,'pos'], y = -log(lead_vars[2,'p_nominal'],10), color = 'red') +
+  labs(x=paste('Positsioon (bp) kromosoomil 3'), y=expression(-log[10](p-väärtus))) + 
+  theme_bw()
+  
+
+manhattan
+
+ggsave(paste0('/gpfs/hpchome/evelin95/plots/ca_splicing/annotation.pdf'), plot = manhattan, width = 5, height = 3)
+```
+
+```{r}
+#qtl_pvalues = select(qtl_pvalues, track_id, p_nominal, pos, lead_variant, R2)
+#saveRDS(qtl_pvalues, paste0(path, 'qtl_pvalues'))
+```
+
+
+```{r}
+ggplot() +
+   annotate("text", x = 122647000, y = 0.46, label = "caQTL juhtvariant") +
+  annotate("text", x = 122647000, y = 0.40, label = "sQTL juhtvariant") + 
+  ylim(0,1) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank(), axis.line = element_line(colour = "black"))
+
+ggsave(paste0('/gpfs/hpchome/evelin95/plots/ca_splicing/annotate.pdf'), width = 5, height = 4)
+```
+
+
+```{r}
+manhattan = ggplot(qtl_pvalues, aes(x = pos, y = -log(p_nominal, 10), colour = R2)) +
+  geom_point() +
+  geom_point(x = lead_vars[1,'pos'], y = -log(lead_vars[1,'p_nominal'],10), color = 'red') +
+  geom_point(x = lead_vars[2,'pos'], y = -log(lead_vars[2,'p_nominal'],10), color = 'red') +
+  labs(x=paste('Positsioon (bp) kromosoomil', chr), y=expression(-log[10](p-väärtus))) + 
+  annotate() + 
+  theme_bw()
+  
+
+manhattan
+
+ggsave(paste0('/gpfs/hpchome/evelin95/plots/ca_splicing/manhattan',peak_id,'.pdf'), plot = manhattan, width = 5, height = 3)
+```
+
